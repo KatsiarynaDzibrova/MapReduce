@@ -26,6 +26,8 @@ int main(int arg, char** args) {
   } else if (std::string(args[COMMAND]) == "reduce") {
     std::unordered_map<std::string, std::vector<int>> words_map;
     std::ifstream global_input(args[IN_FILE]);
+    int num;
+    global_input >> num;
     std::string s;
     while (global_input >> s) {
       int x;

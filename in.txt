@@ -1,4 +1,9 @@
-key	man man hat man
-k ey	man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man panda man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man man man man hat man hat man man hat man
-Key_	man man
-
+5
+0.1	
+0.34	
+0.35	
+0.56	
+0.67	
+0.71	
+0.78	
+0.93	
