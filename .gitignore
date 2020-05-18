@@ -2,3 +2,7 @@
 CMakeLists.txt
 a.out
 cmake-build-debug/
+.ipynb_checkpoints/
+out.txt
+temp.txt
+
