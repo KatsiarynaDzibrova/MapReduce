@@ -4,13 +4,28 @@
 
 namespace bp = boost::process;
 
+enum ArgType{
+  COMMAND = 1,
+  SCRIPT_ADDRESS = 2,
+  IN_FILE = 3,
+  OUT_FILE = 4,
+};
+
 int main(int arg, char** args) {
-  int result = 0;
-  if (std::string(args[1]) == "map") {
-    result = bp::system(args[2], bp::std_out > args[4], bp::std_in < args[3]);
-  } else if (std::string(args[1]) == "reduce") {
+  if(arg != 5) {
+    std::cerr << "require 5 args, got " << arg << std::endl;
+    return 2;
+  }
+  if (std::string(args[COMMAND]) == "map") {
+    int result = bp::system(args[SCRIPT_ADDRESS], bp::std_out > args[OUT_FILE],
+        bp::std_in < args[IN_FILE]);
+    if(result != 0) {
+      std::cerr << "cannot run map" << std::endl;
+      return 3;
+    }
+  } else if (std::string(args[COMMAND]) == "reduce") {
     std::unordered_map<std::string, std::vector<int>> words_map;
-    std::ifstream global_input(args[3]);
+    std::ifstream global_input(args[IN_FILE]);
     std::string s;
     while (global_input >> s) {
       int x;
@@ -32,11 +47,15 @@ int main(int arg, char** args) {
       std::string current_reduce_output = tmpnam(nullptr);
       output_files.push_back(current_reduce_output);
       std::ofstream cur_out(current_reduce_output);
-      result += bp::system(args[2],
+      int result = bp::system(args[SCRIPT_ADDRESS],
                            bp::std_out > current_reduce_output,
                            bp::std_in < current_reduce_input);
+      if (result != 0) {
+        std::cerr << "cannot run reduce" << '\n';
+        return 4;
+      }
     }
-    std::ofstream global_output(args[4]);
+    std::ofstream global_output(args[OUT_FILE]);
     for (const auto& input_name : output_files) {
       std::ifstream current_input(input_name);
       std::string cur_string;
@@ -44,9 +63,9 @@ int main(int arg, char** args) {
       global_output << cur_string << '\n';
     }
   } else {
-    std::cerr << "unknown command: " << args[1] << '\n';
-    result = 1;
+    std::cerr << "unknown command: " << args[COMMAND] << '\n';
+    return 5;
   }
-  if (result != 0) result = 1;
-  return result;
+  return 0;
 }
+
