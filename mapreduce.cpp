@@ -38,7 +38,7 @@ void Sort(const std::string& in_file, const std::string& out_file) {
   std::vector<int64_t> sizes;
   buffer.reserve(BUFF_SIZE);
   while(!fin.eof()) {
-    names.push_back("temp" + std::to_string(num) + ".txt");
+    names.push_back(tmpnam(nullptr));
     std::ofstream file(names[num]);
     int size;
     for (size = 0; size < BUFF_SIZE; ++size) {
@@ -98,11 +98,49 @@ int main(int arg, char** args) {
     return 2;
   }
   if (std::string(args[COMMAND]) == "map") {
-    int result = bp::system(args[SCRIPT_ADDRESS], bp::std_out > args[OUT_FILE],
-        bp::std_in < args[IN_FILE]);
-    if(result != 0) {
-      std::cerr << "cannot run map" << std::endl;
-      return 3;
+    int block_size = 5;
+    std::ifstream fin(args[IN_FILE]);
+    int j = 0;
+    int number_of_bins;
+    fin >> number_of_bins;
+    fin.ignore(1);
+    std::ofstream all_maps_output(args[OUT_FILE]);
+    all_maps_output << number_of_bins << std::endl;
+    std::vector<bp::child> map_processes;
+    std::vector<std::string> output_files;
+    while(!fin.eof()) {
+      j++;
+      std::string current_map_input = tmpnam(nullptr);
+      std::ofstream cur_in(current_map_input);
+      std::vector<std::string> lines;
+      for (int i = 0; i < block_size; ++i) {
+        std::string line;
+        std::getline(fin, line);
+        lines.push_back(line);
+        if ( line == "\n") break;
+      }
+      cur_in << number_of_bins << "\n";
+      for(const auto& el : lines) {
+        cur_in << el << "\n";
+      }
+      std::string current_map_output = tmpnam(nullptr);
+      output_files.push_back(current_map_output);
+      map_processes.emplace_back(args[SCRIPT_ADDRESS],
+                                 bp::std_out > current_map_output,
+                                 bp::std_in < current_map_input);
+      cur_in.close();
+    }
+    for(auto& child : map_processes) {
+      child.wait();
+    }
+    for(const auto& file_name : output_files) {
+      std::ifstream one_map_output(file_name);
+      std::string line;
+      while(getline(one_map_output, line)) {
+        if (line == "\n") continue;
+        all_maps_output << line << "\n";
+      }
+      one_map_output.close();
     }
   } else if (std::string(args[COMMAND]) == "reduce") {
     std::ifstream unsorted_input(args[IN_FILE]);
@@ -112,41 +150,35 @@ int main(int arg, char** args) {
     std::vector<std::string> output_files;
     sorted_input >> first_key;
     int i = 0;
+    std::vector<bp::child> reduce_processes;
     while(!sorted_input.eof()){
       i++;
-      std::cout << first_key << ": ";
       std::string current_reduce_input = tmpnam(nullptr);
       std::ofstream cur_in(current_reduce_input);
       int el;
       sorted_input >> el;
       std::vector<int> values;
-      std::cout << el << " ";
       double cur_key;
       cur_in << first_key << '\t' << el << '\n';
       while(sorted_input >> cur_key) {
         if (first_key != cur_key){
           break;
         }
-        std::cout << el << " ";
         sorted_input >> el;
-        std::cout << "write: " << first_key << '\t' << el << '\n';
         cur_in << first_key << '\t' << el << '\n';
       }
-      std::cout << std::endl;
       first_key = cur_key;
       cur_in.close();
       std::string current_reduce_output = tmpnam(nullptr);
       output_files.push_back(current_reduce_output);
       std::ofstream cur_out(current_reduce_output);
-      int result = bp::system(args[SCRIPT_ADDRESS],
-                              bp::std_out > current_reduce_output,
-                              bp::std_in < current_reduce_input);
-      if (result != 0) {
-        std::cerr << "cannot run reduce" << '\n';
-        return 4;
-      }
+      reduce_processes.emplace_back(bp::child(args[SCRIPT_ADDRESS],
+                                              bp::std_out > current_reduce_output,
+                                              bp::std_in < current_reduce_input));
     }
-
+    for(auto& child : reduce_processes){
+      child.wait();
+    }
     std::ofstream global_output(args[OUT_FILE]);
     int num;
     unsorted_input >> num;
