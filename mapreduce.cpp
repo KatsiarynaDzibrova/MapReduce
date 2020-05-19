@@ -34,11 +34,11 @@ void Sort(const std::string& in_file, const std::string& out_file) {
   int n;
   fin >> n;
   std::vector<std::string> names;
-  int num = 0;
   std::vector<int64_t> sizes;
+  int num = 0;
   buffer.reserve(BUFF_SIZE);
   while(!fin.eof()) {
-    names.push_back(tmpnam(nullptr));
+    names.emplace_back(tmpnam(nullptr));
     std::ofstream file(names[num]);
     int size;
     for (size = 0; size < BUFF_SIZE; ++size) {
@@ -92,15 +92,99 @@ void Sort(const std::string& in_file, const std::string& out_file) {
   }
 }
 
+void run_maps(std::ifstream& fin, const int block_size, const int
+number_of_bins, std::vector<std::string>& output_files, std::vector<bp::child>&
+        map_processes, const char* script_adress) {
+  while(!fin.eof()) {
+    std::string current_map_input = tmpnam(nullptr);
+    std::ofstream cur_in(current_map_input);
+    std::vector<std::string> lines;
+    for (int i = 0; i < block_size; ++i) {
+      std::string line;
+      std::getline(fin, line);
+      lines.push_back(line);
+      if ( line == "\n") break;
+    }
+    cur_in << number_of_bins << "\n";
+    for(const auto& el : lines) {
+      cur_in << el << "\n";
+    }
+    std::string current_map_output = tmpnam(nullptr);
+    output_files.push_back(current_map_output);
+    map_processes.emplace_back(script_adress,
+                               bp::std_out > current_map_output,
+                               bp::std_in < current_map_input);
+    cur_in.close();
+  }
+}
+
+void collect_mappers_outputs(const std::vector<std::string>& output_files,
+    std::ofstream& all_maps_output) {
+  for(const auto& file_name : output_files) {
+    std::ifstream one_map_output(file_name);
+    std::string line;
+    while(getline(one_map_output, line)) {
+      if (line == "\n") continue;
+      all_maps_output << line << "\n";
+    }
+    one_map_output.close();
+  }
+}
+
+void run_reduces(const std::string& sorted_file, std::vector<std::string>&
+    output_files, std::vector<bp::child>& reduce_processes, const std::string&
+    script_adress) {
+  std::ifstream sorted_input(sorted_file);
+  double first_key;
+  sorted_input >> first_key;
+  while(!sorted_input.eof()){
+    std::string current_reduce_input = tmpnam(nullptr);
+    std::ofstream cur_in(current_reduce_input);
+    int el;
+    sorted_input >> el;
+    std::vector<int> values;
+    double cur_key;
+    cur_in << first_key << '\t' << el << '\n';
+    while(sorted_input >> cur_key) {
+      if (first_key != cur_key){
+        break;
+      }
+      sorted_input >> el;
+      cur_in << first_key << '\t' << el << '\n';
+    }
+    first_key = cur_key;
+    cur_in.close();
+    std::string current_reduce_output = tmpnam(nullptr);
+    output_files.push_back(current_reduce_output);
+    std::ofstream cur_out(current_reduce_output);
+    reduce_processes.emplace_back(bp::child(script_adress,
+                                            bp::std_out > current_reduce_output,
+                                            bp::std_in < current_reduce_input));
+  }
+}
+
+void collect_reduces_output(std::ifstream& unsorted_input,
+    const std::vector<std::string>& output_files, const std::string& out_file){
+  std::ofstream global_output(out_file);
+  int num;
+  unsorted_input >> num;
+  global_output << num << "\n";
+  for (const auto& input_name : output_files) {
+    std::ifstream current_input(input_name);
+    std::string cur_string;
+    std::getline(current_input, cur_string);
+    global_output << cur_string << '\n';
+  }
+}
+
 int main(int arg, char** args) {
   if(arg != 5) {
     std::cerr << "require 5 args, got " << arg << std::endl;
     return 2;
   }
   if (std::string(args[COMMAND]) == "map") {
-    int block_size = 5;
+    int block_size = 4000;
     std::ifstream fin(args[IN_FILE]);
-    int j = 0;
     int number_of_bins;
     fin >> number_of_bins;
     fin.ignore(1);
@@ -108,87 +192,24 @@ int main(int arg, char** args) {
     all_maps_output << number_of_bins << std::endl;
     std::vector<bp::child> map_processes;
     std::vector<std::string> output_files;
-    while(!fin.eof()) {
-      j++;
-      std::string current_map_input = tmpnam(nullptr);
-      std::ofstream cur_in(current_map_input);
-      std::vector<std::string> lines;
-      for (int i = 0; i < block_size; ++i) {
-        std::string line;
-        std::getline(fin, line);
-        lines.push_back(line);
-        if ( line == "\n") break;
-      }
-      cur_in << number_of_bins << "\n";
-      for(const auto& el : lines) {
-        cur_in << el << "\n";
-      }
-      std::string current_map_output = tmpnam(nullptr);
-      output_files.push_back(current_map_output);
-      map_processes.emplace_back(args[SCRIPT_ADDRESS],
-                                 bp::std_out > current_map_output,
-                                 bp::std_in < current_map_input);
-      cur_in.close();
-    }
+    run_maps(fin, block_size, number_of_bins, output_files, map_processes,
+        args[SCRIPT_ADDRESS]);
     for(auto& child : map_processes) {
       child.wait();
     }
-    for(const auto& file_name : output_files) {
-      std::ifstream one_map_output(file_name);
-      std::string line;
-      while(getline(one_map_output, line)) {
-        if (line == "\n") continue;
-        all_maps_output << line << "\n";
-      }
-      one_map_output.close();
-    }
+    collect_mappers_outputs(output_files, all_maps_output);
   } else if (std::string(args[COMMAND]) == "reduce") {
     std::ifstream unsorted_input(args[IN_FILE]);
-    Sort(args[IN_FILE], "sorted.txt");
-    std::ifstream sorted_input("sorted.txt");
-    double first_key;
+    std::string sorted_file = tmpnam(nullptr);
+    Sort(args[IN_FILE], sorted_file);
     std::vector<std::string> output_files;
-    sorted_input >> first_key;
-    int i = 0;
     std::vector<bp::child> reduce_processes;
-    while(!sorted_input.eof()){
-      i++;
-      std::string current_reduce_input = tmpnam(nullptr);
-      std::ofstream cur_in(current_reduce_input);
-      int el;
-      sorted_input >> el;
-      std::vector<int> values;
-      double cur_key;
-      cur_in << first_key << '\t' << el << '\n';
-      while(sorted_input >> cur_key) {
-        if (first_key != cur_key){
-          break;
-        }
-        sorted_input >> el;
-        cur_in << first_key << '\t' << el << '\n';
-      }
-      first_key = cur_key;
-      cur_in.close();
-      std::string current_reduce_output = tmpnam(nullptr);
-      output_files.push_back(current_reduce_output);
-      std::ofstream cur_out(current_reduce_output);
-      reduce_processes.emplace_back(bp::child(args[SCRIPT_ADDRESS],
-                                              bp::std_out > current_reduce_output,
-                                              bp::std_in < current_reduce_input));
-    }
+    run_reduces(sorted_file, output_files, reduce_processes,
+        args[SCRIPT_ADDRESS]);
     for(auto& child : reduce_processes){
       child.wait();
     }
-    std::ofstream global_output(args[OUT_FILE]);
-    int num;
-    unsorted_input >> num;
-    global_output << num << "\n";
-    for (const auto& input_name : output_files) {
-      std::ifstream current_input(input_name);
-      std::string cur_string;
-      std::getline(current_input, cur_string);
-      global_output << cur_string << '\n';
-    }
+    collect_reduces_output(unsorted_input, output_files, args[OUT_FILE]);
   } else {
     std::cerr << "unknown command: " << args[COMMAND] << '\n';
     return 5;
