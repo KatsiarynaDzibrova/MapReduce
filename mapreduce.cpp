@@ -5,13 +5,9 @@
 
 namespace bp = boost::process;
 
-enum ArgType{
-  COMMAND = 1,
-  SCRIPT_ADDRESS = 2,
-  IN_FILE = 3,
-  OUT_FILE = 4,
+enum ArgType {
+  COMMAND = 1, SCRIPT_ADDRESS = 2, IN_FILE = 3, OUT_FILE = 4,
 };
-
 
 const uint64_t BUFF_SIZE = 4000;
 
@@ -37,14 +33,14 @@ void Sort(const std::string& in_file, const std::string& out_file) {
   std::vector<int64_t> sizes;
   int num = 0;
   buffer.reserve(BUFF_SIZE);
-  while(!fin.eof()) {
+  while (!fin.eof()) {
     names.emplace_back(tmpnam(nullptr));
     std::ofstream file(names[num]);
     int size;
     for (size = 0; size < BUFF_SIZE; ++size) {
       double key;
       int val;
-      if (!(fin >> key >> val)){
+      if (!(fin >> key >> val)) {
         break;
       }
       buffer[size] = key;
@@ -65,7 +61,7 @@ void Sort(const std::string& in_file, const std::string& out_file) {
     files[i] = std::ifstream(names[i]);
     files[i].seekg(0, std::ios::beg);
     files[i] >> buffer[i];
-    queue.push({buffer[i], (double)i});
+    queue.push({buffer[i], (double) i});
   }
   double write_buffer[BUFF_SIZE];
   uint64_t i = 0;
@@ -82,20 +78,23 @@ void Sort(const std::string& in_file, const std::string& out_file) {
     i++;
     if (i >= BUFF_SIZE) {
       i = 0;
-      for(const auto& it : write_buffer) {
+      for (const auto& it : write_buffer) {
         fout << it << "\t1\n";
       }
     }
   }
-  for(int j = 0; j < i; ++j) {
+  for (int j = 0; j < i; ++j) {
     fout << write_buffer[j] << "\t1\n";
   }
 }
 
-void run_maps(std::ifstream& fin, const int block_size, const int
-number_of_bins, std::vector<std::string>& output_files, std::vector<bp::child>&
-        map_processes, const char* script_adress) {
-  while(!fin.eof()) {
+void run_maps(std::ifstream& fin,
+              const int block_size,
+              const int number_of_bins,
+              std::vector<std::string>& output_files,
+              std::vector<bp::child>& map_processes,
+              const char* script_adress) {
+  while (!fin.eof()) {
     std::string current_map_input = tmpnam(nullptr);
     std::ofstream cur_in(current_map_input);
     std::vector<std::string> lines;
@@ -103,10 +102,10 @@ number_of_bins, std::vector<std::string>& output_files, std::vector<bp::child>&
       std::string line;
       std::getline(fin, line);
       lines.push_back(line);
-      if ( line == "\n") break;
+      if (line == "\n") break;
     }
     cur_in << number_of_bins << "\n";
-    for(const auto& el : lines) {
+    for (const auto& el : lines) {
       cur_in << el << "\n";
     }
     std::string current_map_output = tmpnam(nullptr);
@@ -119,11 +118,11 @@ number_of_bins, std::vector<std::string>& output_files, std::vector<bp::child>&
 }
 
 void collect_mappers_outputs(const std::vector<std::string>& output_files,
-    std::ofstream& all_maps_output) {
-  for(const auto& file_name : output_files) {
+                             std::ofstream& all_maps_output) {
+  for (const auto& file_name : output_files) {
     std::ifstream one_map_output(file_name);
     std::string line;
-    while(getline(one_map_output, line)) {
+    while (getline(one_map_output, line)) {
       if (line == "\n") continue;
       all_maps_output << line << "\n";
     }
@@ -131,13 +130,14 @@ void collect_mappers_outputs(const std::vector<std::string>& output_files,
   }
 }
 
-void run_reduces(const std::string& sorted_file, std::vector<std::string>&
-    output_files, std::vector<bp::child>& reduce_processes, const std::string&
-    script_adress) {
+void run_reduces(const std::string& sorted_file,
+                 std::vector<std::string>& output_files,
+                 std::vector<bp::child>& reduce_processes,
+                 const std::string& script_adress) {
   std::ifstream sorted_input(sorted_file);
   double first_key;
   sorted_input >> first_key;
-  while(!sorted_input.eof()){
+  while (!sorted_input.eof()) {
     std::string current_reduce_input = tmpnam(nullptr);
     std::ofstream cur_in(current_reduce_input);
     int el;
@@ -145,8 +145,8 @@ void run_reduces(const std::string& sorted_file, std::vector<std::string>&
     std::vector<int> values;
     double cur_key;
     cur_in << first_key << '\t' << el << '\n';
-    while(sorted_input >> cur_key) {
-      if (first_key != cur_key){
+    while (sorted_input >> cur_key) {
+      if (first_key != cur_key) {
         break;
       }
       sorted_input >> el;
@@ -164,7 +164,8 @@ void run_reduces(const std::string& sorted_file, std::vector<std::string>&
 }
 
 void collect_reduces_output(std::ifstream& unsorted_input,
-    const std::vector<std::string>& output_files, const std::string& out_file){
+                            const std::vector<std::string>& output_files,
+                            const std::string& out_file) {
   std::ofstream global_output(out_file);
   int num;
   unsorted_input >> num;
@@ -178,7 +179,7 @@ void collect_reduces_output(std::ifstream& unsorted_input,
 }
 
 int main(int arg, char** args) {
-  if(arg != 5) {
+  if (arg != 5) {
     std::cerr << "require 5 args, got " << arg << std::endl;
     return 2;
   }
@@ -192,9 +193,13 @@ int main(int arg, char** args) {
     all_maps_output << number_of_bins << std::endl;
     std::vector<bp::child> map_processes;
     std::vector<std::string> output_files;
-    run_maps(fin, block_size, number_of_bins, output_files, map_processes,
-        args[SCRIPT_ADDRESS]);
-    for(auto& child : map_processes) {
+    run_maps(fin,
+             block_size,
+             number_of_bins,
+             output_files,
+             map_processes,
+             args[SCRIPT_ADDRESS]);
+    for (auto& child : map_processes) {
       child.wait();
     }
     collect_mappers_outputs(output_files, all_maps_output);
@@ -204,9 +209,11 @@ int main(int arg, char** args) {
     Sort(args[IN_FILE], sorted_file);
     std::vector<std::string> output_files;
     std::vector<bp::child> reduce_processes;
-    run_reduces(sorted_file, output_files, reduce_processes,
-        args[SCRIPT_ADDRESS]);
-    for(auto& child : reduce_processes){
+    run_reduces(sorted_file,
+                output_files,
+                reduce_processes,
+                args[SCRIPT_ADDRESS]);
+    for (auto& child : reduce_processes) {
       child.wait();
     }
     collect_reduces_output(unsorted_input, output_files, args[OUT_FILE]);

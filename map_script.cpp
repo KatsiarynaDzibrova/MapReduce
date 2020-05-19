@@ -6,7 +6,7 @@ int main() {
   std::cin >> num;
   double key;
   while (std::cin >> key) {
-    key = (double)(int)(key * num) / num;
+    key = (double) (int) (key * num) / num;
     std::cout << key << "\t1\n";
   }
   return 0;
